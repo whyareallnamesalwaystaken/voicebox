@@ -297,6 +297,7 @@
       "sampleRequired": "需要音訊樣本",
       "referenceTextRequired": "需要參考文字",
       "audioTooLong": "音訊過長({{duration}})。最大時長為 {{max}}。",
+      "audioTooShort": "音訊過短({{duration}})。可用的語音複製最短需要 {{min}}。",
       "audioFailed": "音訊檔案驗證失敗。請嘗試其他檔案。"
     },
     "toast": {
@@ -337,6 +338,7 @@
       "referenceTextRequiredDescription": "請提供音訊樣本的參考文字。",
       "invalidAudio": "音訊檔案無效",
       "invalidAudioDescription": "音訊時長為 {{duration}},但最大為 {{max}}。",
+      "invalidAudioTooShortDescription": "音訊時長為 {{duration}},但最小為 {{min}}。",
       "validationError": "驗證錯誤",
       "rollbackFailed": "復原失敗",
       "rollbackFailedDescription": "樣本上傳失敗後無法移除已建立的檔案。",
@@ -349,6 +351,8 @@
   },
   "audioSample": {
     "chooseFile": "選擇檔案",
+    "dropRejectedTitle": "這似乎不是音訊檔案",
+    "dropRejectedDescription": "請嘗試常見的音訊格式,例如 MP3、WAV 或 M4A。",
     "uploadHint": "點選以選擇檔案或拖放。最大時長:30 秒。",
     "fileUploaded": "檔案已上傳",
     "fileLabel": "檔案:{{name}}",

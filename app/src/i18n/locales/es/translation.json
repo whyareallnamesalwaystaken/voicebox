@@ -297,6 +297,7 @@
       "sampleRequired": "La muestra de audio es obligatoria",
       "referenceTextRequired": "El texto de referencia es obligatorio",
       "audioTooLong": "El audio es demasiado largo ({{duration}}). La duración máxima es {{max}}.",
+      "audioTooShort": "El audio es demasiado corto ({{duration}}). La duración mínima es {{min}} para un clon de voz utilizable.",
       "audioFailed": "Error al validar el archivo de audio. Prueba con otro archivo."
     },
     "toast": {
@@ -337,6 +338,7 @@
       "referenceTextRequiredDescription": "Proporciona el texto de referencia para la muestra de audio.",
       "invalidAudio": "Archivo de audio no válido",
       "invalidAudioDescription": "La duración del audio es {{duration}}, pero el máximo es {{max}}.",
+      "invalidAudioTooShortDescription": "La duración del audio es {{duration}}, pero el mínimo es {{min}}.",
       "validationError": "Error de validación",
       "rollbackFailed": "Error al revertir",
       "rollbackFailedDescription": "El perfil creado no se pudo eliminar tras el fallo de subida de la muestra.",
@@ -349,6 +351,8 @@
   },
   "audioSample": {
     "chooseFile": "Elegir archivo",
+    "dropRejectedTitle": "Eso no parece un archivo de audio",
+    "dropRejectedDescription": "Prueba un formato de audio común como MP3, WAV o M4A.",
     "uploadHint": "Haz clic para elegir un archivo o arrástralo y suéltalo. Duración máxima: 30 segundos.",
     "fileUploaded": "Archivo subido",
     "fileLabel": "Archivo: {{name}}",

@@ -12,6 +12,10 @@ import { useServerStore } from '@/stores/serverStore';
 
 type RestartPhase = 'idle' | 'stopping' | 'waiting' | 'ready';
 
+// A GPU-backend restart can legitimately take a while (model reload), but
+// must not poll forever if the backend never comes back at all.
+const HEALTH_POLL_TIMEOUT_MS = 90_000;
+
 export function GpuAcceleration() {
   const platform = usePlatform();
   const queryClient = useQueryClient();
@@ -144,10 +148,16 @@ export function GpuAcceleration() {
     };
   }, [rocmDownloading, serverUrl, refetchRocmStatus]);
 
-  // Start aggressive health polling during restart
+  // Start aggressive health polling during restart. Capped at
+  // HEALTH_POLL_TIMEOUT_MS -- an uncapped loop here previously left the UI
+  // stuck on "Restarting server..." forever with no error and no cancel if
+  // the newly selected GPU backend never actually came up (e.g. a machine
+  // without a real CUDA-capable GPU, or missing runtime DLLs -- the same
+  // failure mode the backend's own CUDA/ROCm download bugs can produce).
   const startHealthPolling = useCallback(() => {
     if (healthPollRef.current) return;
 
+    const startedAt = Date.now();
     healthPollRef.current = setInterval(async () => {
       try {
         const result = await apiClient.getHealth();
@@ -162,9 +172,21 @@ export function GpuAcceleration() {
           queryClient.invalidateQueries();
           // Reset after a moment
           setTimeout(() => setRestartPhase('idle'), 2000);
+          return;
         }
       } catch {
         // Server still down, keep polling
+      }
+
+      if (Date.now() - startedAt > HEALTH_POLL_TIMEOUT_MS) {
+        if (healthPollRef.current) {
+          clearInterval(healthPollRef.current);
+          healthPollRef.current = null;
+        }
+        setRestartPhase('idle');
+        setError(
+          'The server did not come back up. It may have failed to start with the selected backend -- check the logs, or try switching to CPU.',
+        );
       }
     }, 1000);
   }, [queryClient]);

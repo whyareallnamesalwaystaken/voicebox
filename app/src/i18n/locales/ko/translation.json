@@ -297,6 +297,7 @@
       "sampleRequired": "오디오 샘플이 필요합니다",
       "referenceTextRequired": "참조 텍스트가 필요합니다",
       "audioTooLong": "오디오가 너무 깁니다 ({{duration}}). 최대 길이는 {{max}}입니다.",
+      "audioTooShort": "오디오가 너무 짧습니다 ({{duration}}). 사용 가능한 음성 복제를 위한 최소 길이는 {{min}}입니다.",
       "audioFailed": "오디오 파일 검증에 실패했습니다. 다른 파일을 시도해 주세요."
     },
     "toast": {
@@ -337,6 +338,7 @@
       "referenceTextRequiredDescription": "오디오 샘플의 참조 텍스트를 제공해 주세요.",
       "invalidAudio": "잘못된 오디오 파일",
       "invalidAudioDescription": "오디오 길이가 {{duration}}입니다. 최대 길이는 {{max}}입니다.",
+      "invalidAudioTooShortDescription": "오디오 길이가 {{duration}}입니다. 최소 길이는 {{min}}입니다.",
       "validationError": "검증 오류",
       "rollbackFailed": "롤백 실패",
       "rollbackFailedDescription": "샘플 업로드 실패 후 생성된 프로필을 제거할 수 없습니다.",
@@ -349,6 +351,8 @@
   },
   "audioSample": {
     "chooseFile": "파일 선택",
+    "dropRejectedTitle": "오디오 파일이 아닌 것 같습니다",
+    "dropRejectedDescription": "MP3, WAV, M4A 같은 일반적인 오디오 형식을 사용해 보세요.",
     "uploadHint": "클릭하여 파일을 선택하거나 드래그 앤 드롭하세요. 최대 길이: 30초.",
     "fileUploaded": "파일 업로드됨",
     "fileLabel": "파일: {{name}}",

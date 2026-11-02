@@ -61,6 +61,11 @@ import { AudioSampleUpload } from './AudioSampleUpload';
 import { SampleList } from './SampleList';
 
 const MAX_AUDIO_DURATION_SECONDS = 30;
+// Below this, a clip is too short to give the cloning model a stable voice
+// print: a near-silent tap-and-release recording or an accidental sub-second
+// upload used to sail through with no warning and only show up later as
+// garbled cloned speech.
+const MIN_AUDIO_DURATION_SECONDS = 3;
 const MAX_DESIGN_PROMPT_LENGTH = 500;
 /** Engines that can't be a default for a sample-based (cloned) profile. */
 const PRESET_ONLY_ENGINES = new Set(['kokoro', 'qwen_custom_voice', 'qwen_voice_design']);
@@ -198,6 +203,14 @@ export function ProfileForm() {
               message: t('profileForm.validation.audioTooLong', {
                 duration: formatAudioDuration(duration),
                 max: formatAudioDuration(MAX_AUDIO_DURATION_SECONDS),
+              }),
+            });
+          } else if (duration < MIN_AUDIO_DURATION_SECONDS) {
+            form.setError('sampleFile', {
+              type: 'manual',
+              message: t('profileForm.validation.audioTooShort', {
+                duration: formatAudioDuration(duration),
+                min: formatAudioDuration(MIN_AUDIO_DURATION_SECONDS),
               }),
             });
           } else {
@@ -693,6 +706,24 @@ export function ProfileForm() {
               description: t('profileForm.toast.invalidAudioDescription', {
                 duration: formatAudioDuration(duration),
                 max: formatAudioDuration(MAX_AUDIO_DURATION_SECONDS),
+              }),
+              variant: 'destructive',
+            });
+            return;
+          }
+          if (duration < MIN_AUDIO_DURATION_SECONDS) {
+            form.setError('sampleFile', {
+              type: 'manual',
+              message: t('profileForm.validation.audioTooShort', {
+                duration: formatAudioDuration(duration),
+                min: formatAudioDuration(MIN_AUDIO_DURATION_SECONDS),
+              }),
+            });
+            toast({
+              title: t('profileForm.toast.invalidAudio'),
+              description: t('profileForm.toast.invalidAudioTooShortDescription', {
+                duration: formatAudioDuration(duration),
+                min: formatAudioDuration(MIN_AUDIO_DURATION_SECONDS),
               }),
               variant: 'destructive',
             });

@@ -297,6 +297,7 @@
       "sampleRequired": "Un échantillon audio est requis",
       "referenceTextRequired": "Le texte de référence est requis",
       "audioTooLong": "L'audio est trop long ({{duration}}). La durée maximale est de {{max}}.",
+      "audioTooShort": "L'audio est trop court ({{duration}}). La durée minimale est de {{min}} pour un clonage vocal utilisable.",
       "audioFailed": "Échec de la validation du fichier audio. Veuillez essayer un autre fichier."
     },
     "toast": {
@@ -337,6 +338,7 @@
       "referenceTextRequiredDescription": "Veuillez fournir le texte de référence pour l'échantillon audio.",
       "invalidAudio": "Fichier audio invalide",
       "invalidAudioDescription": "La durée audio est de {{duration}}, mais le maximum est {{max}}.",
+      "invalidAudioTooShortDescription": "La durée audio est de {{duration}}, mais le minimum est {{min}}.",
       "validationError": "Erreur de validation",
       "rollbackFailed": "Échec de l'annulation",
       "rollbackFailedDescription": "Le profil créé n'a pas pu être supprimé après l'échec du téléchargement de l'échantillon.",
@@ -349,6 +351,8 @@
   },
   "audioSample": {
     "chooseFile": "Choisir un fichier",
+    "dropRejectedTitle": "Cela ne ressemble pas à un fichier audio",
+    "dropRejectedDescription": "Essayez un format audio courant comme MP3, WAV ou M4A.",
     "uploadHint": "Cliquez pour choisir un fichier ou glissez-déposez. Durée maximale : 30 secondes.",
     "fileUploaded": "Fichier téléchargé",
     "fileLabel": "Fichier : {{name}}",

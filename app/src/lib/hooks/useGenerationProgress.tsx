@@ -181,7 +181,16 @@ export function useGenerationProgress() {
         source.close();
         currentSources.delete(id);
         removePendingGeneration(id);
+        // Also drop a queued add-to-story for this id; otherwise it stays
+        // pending forever once the stream that would have completed it is gone.
+        removePendingStoryAdd(id);
         queryClient.refetchQueries({ queryKey: ['history'] });
+
+        toast({
+          title: 'Connection lost',
+          description: 'Lost the connection while generating. Check history to see if it finished.',
+          variant: 'destructive',
+        });
       };
 
       currentSources.set(id, source);

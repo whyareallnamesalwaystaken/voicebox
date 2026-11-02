@@ -57,6 +57,35 @@ import type {
   CloudStatus,
 } from './types';
 
+// Plain `fetch()` never times out on its own -- a hung backend (model still
+// loading, a deadlocked thread, a crashed-but-not-exited process) previously
+// left every button in the app stuck on "Uploading.../Saving.../Generating..."
+// forever, with no error and no way to cancel. DEFAULT covers ordinary JSON
+// CRUD calls; LONG covers endpoints that do real file/audio work synchronously
+// in the request itself (uploads, transcription, exports/imports, effects
+// preview) and can legitimately take a while.
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const LONG_REQUEST_TIMEOUT_MS = 180_000;
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error('Request timed out -- the server may be busy or unresponsive.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function formatErrorDetail(detail: unknown, fallback: string): string {
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) {
@@ -78,15 +107,23 @@ class ApiClient {
     return serverUrl;
   }
 
-  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options?: RequestInit,
+    timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
+  ): Promise<T> {
     const url = `${this.getBaseUrl()}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
+    const response = await fetchWithTimeout(
+      url,
+      {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
       },
-    });
+      timeoutMs,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -157,10 +194,11 @@ class ApiClient {
     formData.append('file', file);
     formData.append('reference_text', referenceText);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await fetchWithTimeout(
+      url,
+      { method: 'POST', body: formData },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -194,7 +232,7 @@ class ApiClient {
 
   async exportProfile(profileId: string): Promise<Blob> {
     const url = `${this.getBaseUrl()}/profiles/${profileId}/export`;
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url, {}, LONG_REQUEST_TIMEOUT_MS);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -211,10 +249,11 @@ class ApiClient {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await fetchWithTimeout(
+      url,
+      { method: 'POST', body: formData },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -231,10 +270,11 @@ class ApiClient {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await fetchWithTimeout(
+      url,
+      { method: 'POST', body: formData },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -281,10 +321,11 @@ class ApiClient {
   async importAudio(file: File): Promise<GenerationResponse> {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`${this.getBaseUrl()}/generate/import`, {
-      method: 'POST',
-      body: form,
-    });
+    const res = await fetchWithTimeout(
+      `${this.getBaseUrl()}/generate/import`,
+      { method: 'POST', body: form },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
     if (!res.ok) {
       const detail = await res.text().catch(() => res.statusText);
       throw new Error(detail || `HTTP ${res.status}`);
@@ -330,7 +371,7 @@ class ApiClient {
 
   async exportGeneration(generationId: string): Promise<Blob> {
     const url = `${this.getBaseUrl()}/history/${generationId}/export`;
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url, {}, LONG_REQUEST_TIMEOUT_MS);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -347,7 +388,7 @@ class ApiClient {
     format: GenerationExportFormat = 'wav',
   ): Promise<Blob> {
     const url = `${this.getBaseUrl()}/history/${generationId}/export-audio?format=${format}`;
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url, {}, LONG_REQUEST_TIMEOUT_MS);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -370,10 +411,11 @@ class ApiClient {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await fetchWithTimeout(
+      url,
+      { method: 'POST', body: formData },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -415,10 +457,11 @@ class ApiClient {
     }
 
     const url = `${this.getBaseUrl()}/transcribe`;
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await fetchWithTimeout(
+      url,
+      { method: 'POST', body: formData },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -456,7 +499,11 @@ class ApiClient {
     if (options?.sttModel) formData.append('stt_model', options.sttModel);
 
     const url = `${this.getBaseUrl()}/captures`;
-    const response = await fetch(url, { method: 'POST', body: formData });
+    const response = await fetchWithTimeout(
+      url,
+      { method: 'POST', body: formData },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
     if (!response.ok) {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
@@ -839,7 +886,7 @@ class ApiClient {
     const params = new URLSearchParams({ format });
     if (format !== 'wav') params.set('chapters', 'auto');
     const url = `${this.getBaseUrl()}/stories/${storyId}/export-audio?${params}`;
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url, {}, LONG_REQUEST_TIMEOUT_MS);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({
@@ -932,11 +979,15 @@ class ApiClient {
 
   async previewEffects(generationId: string, effectsChain: EffectConfig[]): Promise<Blob> {
     const url = `${this.getBaseUrl()}/effects/preview/${generationId}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ effects_chain: effectsChain }),
-    });
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ effects_chain: effectsChain }),
+      },
+      LONG_REQUEST_TIMEOUT_MS,
+    );
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({

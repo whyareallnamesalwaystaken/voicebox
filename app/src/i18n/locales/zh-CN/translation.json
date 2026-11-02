@@ -297,6 +297,7 @@
       "sampleRequired": "需要音频样本",
       "referenceTextRequired": "需要参考文本",
       "audioTooLong": "音频过长({{duration}})。最大时长为 {{max}}。",
+      "audioTooShort": "音频过短({{duration}})。可用的语音克隆最短需要 {{min}}。",
       "audioFailed": "音频文件验证失败。请尝试其他文件。"
     },
     "toast": {
@@ -337,6 +338,7 @@
       "referenceTextRequiredDescription": "请提供音频样本的参考文本。",
       "invalidAudio": "音频文件无效",
       "invalidAudioDescription": "音频时长为 {{duration}},但最大为 {{max}}。",
+      "invalidAudioTooShortDescription": "音频时长为 {{duration}},但最小为 {{min}}。",
       "validationError": "验证错误",
       "rollbackFailed": "回滚失败",
       "rollbackFailedDescription": "样本上传失败后无法移除已创建的档案。",
@@ -349,6 +351,8 @@
   },
   "audioSample": {
     "chooseFile": "选择文件",
+    "dropRejectedTitle": "这似乎不是音频文件",
+    "dropRejectedDescription": "请尝试常见的音频格式,例如 MP3、WAV 或 M4A。",
     "uploadHint": "点击选择文件或拖放。最大时长:30 秒。",
     "fileUploaded": "文件已上传",
     "fileLabel": "文件:{{name}}",

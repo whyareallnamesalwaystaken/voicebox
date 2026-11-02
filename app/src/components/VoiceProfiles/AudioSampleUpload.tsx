@@ -3,6 +3,20 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { FormControl, FormItem, FormMessage } from '@/components/ui/form';
+import { useToast } from '@/components/ui/use-toast';
+
+// The dropped file's browser-reported MIME type is unreliable (some OS/file-
+// manager combos, especially on Windows, don't tag common audio containers
+// as `audio/*`), so a type check alone silently swallows valid drops. Fall
+// back to the file extension -- same permissiveness the "Choose file" input
+// already has, since it has no type check at all.
+const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.aiff', '.webm'];
+
+function looksLikeAudio(file: File): boolean {
+  if (file.type.startsWith('audio/')) return true;
+  const lowerName = file.name.toLowerCase();
+  return AUDIO_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+}
 
 interface AudioSampleUploadProps {
   file: File | null | undefined;
@@ -28,6 +42,7 @@ export function AudioSampleUpload({
   fieldName,
 }: AudioSampleUploadProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,8 +80,15 @@ export function AudioSampleUpload({
               e.preventDefault();
               setIsDragging(false);
               const droppedFile = e.dataTransfer.files?.[0];
-              if (droppedFile?.type.startsWith('audio/')) {
+              if (!droppedFile) return;
+              if (looksLikeAudio(droppedFile)) {
                 onFileChange(droppedFile);
+              } else {
+                toast({
+                  title: t('audioSample.dropRejectedTitle'),
+                  description: t('audioSample.dropRejectedDescription'),
+                  variant: 'destructive',
+                });
               }
             }}
             onKeyDown={(e) => {

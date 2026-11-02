@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import sys
 import tarfile
 from pathlib import Path
@@ -321,6 +322,27 @@ async def _download_cuda_binary_locked(version: Optional[str] = None):
     server_archive = f"voicebox-server-cuda-{plat}.tar.gz"
     libs_archive = f"cuda-libs-{plat}-{CUDA_LIBS_VERSION}.tar.gz"
 
+    # Always stage when any download is needed, then atomically rename over
+    # cuda_dir on success. This prevents a failed mid-extraction (a dropped
+    # connection after the server archive lands but before the libs archive
+    # finishes, for instance) from leaving cuda_dir in a partially-installed
+    # state that still passes the get_cuda_binary_path() existence check.
+    # Existing files are pre-copied into staging so partial updates
+    # (libs-only or server-only) preserve whatever isn't being re-downloaded.
+    # Mirrors rocm.py's identical staging pattern.
+    use_staging = need_server or need_libs
+    staging_dir = get_backends_dir() / "cuda-staging"
+
+    if use_staging:
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        if cuda_dir.exists():
+            shutil.copytree(cuda_dir, staging_dir, dirs_exist_ok=True)
+        extract_dir = staging_dir
+    else:
+        extract_dir = cuda_dir
+
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
             # Estimate total download size
@@ -348,7 +370,7 @@ async def _download_cuda_binary_locked(version: Optional[str] = None):
                     client,
                     url=f"{base_url}/{server_archive}",
                     sha256_url=f"{base_url}/{server_archive}.sha256",
-                    dest_dir=cuda_dir,
+                    dest_dir=extract_dir,
                     label="CUDA server",
                     progress_offset=offset,
                     total_size=total_size,
@@ -356,7 +378,7 @@ async def _download_cuda_binary_locked(version: Optional[str] = None):
                 offset += server_downloaded
 
                 # Make executable on Unix
-                exe_path = cuda_dir / get_cuda_exe_name()
+                exe_path = extract_dir / get_cuda_exe_name()
                 if sys.platform != "win32" and exe_path.exists():
                     exe_path.chmod(0o755)
 
@@ -366,7 +388,7 @@ async def _download_cuda_binary_locked(version: Optional[str] = None):
                     client,
                     url=f"{base_url}/{libs_archive}",
                     sha256_url=f"{base_url}/{libs_archive}.sha256",
-                    dest_dir=cuda_dir,
+                    dest_dir=extract_dir,
                     label="CUDA libraries",
                     progress_offset=offset,
                     total_size=total_size,
@@ -374,12 +396,31 @@ async def _download_cuda_binary_locked(version: Optional[str] = None):
 
                 # Write local cuda-libs.json manifest
                 manifest = {"version": CUDA_LIBS_VERSION}
-                get_cuda_libs_manifest_path().write_text(json.dumps(manifest, indent=2) + "\n")
+                (extract_dir / "cuda-libs.json").write_text(json.dumps(manifest, indent=2) + "\n")
+
+        # Atomic swap: replace cuda_dir with the fully-extracted staging dir
+        if use_staging:
+            backup_dir = get_backends_dir() / "cuda-backup"
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            if cuda_dir.exists():
+                cuda_dir.rename(backup_dir)
+            try:
+                staging_dir.rename(cuda_dir)
+            except Exception:
+                if backup_dir.exists() and not cuda_dir.exists():
+                    backup_dir.rename(cuda_dir)
+                raise
+            else:
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
 
         logger.info(f"CUDA backend ready at {cuda_dir}")
         progress.mark_complete(PROGRESS_KEY)
 
     except Exception as e:
+        if use_staging and staging_dir.exists():
+            shutil.rmtree(staging_dir)
         logger.error(f"CUDA backend download failed: {e}")
         progress.mark_error(PROGRESS_KEY, str(e))
         raise

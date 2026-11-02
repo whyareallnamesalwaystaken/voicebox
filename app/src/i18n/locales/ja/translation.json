@@ -297,6 +297,7 @@
       "sampleRequired": "オーディオサンプルが必要です",
       "referenceTextRequired": "リファレンステキストは必須です",
       "audioTooLong": "オーディオが長すぎます({{duration}})。最大時間は {{max}} です。",
+      "audioTooShort": "オーディオが短すぎます({{duration}})。使用可能な音声クローンには最低 {{min}} が必要です。",
       "audioFailed": "オーディオファイルを検証できませんでした。別のファイルをお試しください。"
     },
     "toast": {
@@ -337,6 +338,7 @@
       "referenceTextRequiredDescription": "オーディオサンプルのリファレンステキストを入力してください。",
       "invalidAudio": "無効なオーディオファイル",
       "invalidAudioDescription": "オーディオの長さは {{duration}} ですが、最大は {{max}} です。",
+      "invalidAudioTooShortDescription": "オーディオの長さは {{duration}} ですが、最小は {{min}} です。",
       "validationError": "検証エラー",
       "rollbackFailed": "ロールバックに失敗しました",
       "rollbackFailedDescription": "サンプルのアップロード失敗後、作成されたプロファイルを削除できませんでした。",
@@ -349,6 +351,8 @@
   },
   "audioSample": {
     "chooseFile": "ファイルを選択",
+    "dropRejectedTitle": "オーディオファイルではないようです",
+    "dropRejectedDescription": "MP3、WAV、M4A などの一般的なオーディオ形式をお試しください。",
     "uploadHint": "クリックしてファイルを選択するか、ドラッグ&ドロップしてください。最大時間:30 秒。",
     "fileUploaded": "ファイルをアップロードしました",
     "fileLabel": "ファイル:{{name}}",

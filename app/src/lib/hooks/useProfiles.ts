@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import type { VoiceProfileCreate } from '@/lib/api/types';
 import { usePlatform } from '@/platform/PlatformContext';
@@ -46,6 +47,7 @@ export function useUpdateProfile() {
 
 export function useDeleteProfile() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (profileId: string) => apiClient.deleteProfile(profileId),
@@ -55,6 +57,13 @@ export function useDeleteProfile() {
       // reference — both caches still hold rows that no longer exist.
       queryClient.invalidateQueries({ queryKey: ['history'] });
       queryClient.invalidateQueries({ queryKey: ['stories'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Could not delete the profile.',
+        variant: 'destructive',
+      });
     },
   });
 }
@@ -93,11 +102,19 @@ export function useAddSample() {
 
 export function useDeleteSample() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (sampleId: string) => apiClient.deleteProfileSample(sampleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Delete failed',
+        description: error instanceof Error ? error.message : 'Could not delete the sample.',
+        variant: 'destructive',
+      });
     },
   });
 }
@@ -122,8 +139,16 @@ export function useUpdateSample() {
 
 export function useExportProfile() {
   const platform = usePlatform();
+  const { toast } = useToast();
 
   return useMutation({
+    onError: (error) => {
+      toast({
+        title: 'Export failed',
+        description: error instanceof Error ? error.message : 'Could not export the profile.',
+        variant: 'destructive',
+      });
+    },
     mutationFn: async (profileId: string) => {
       const blob = await apiClient.exportProfile(profileId);
 

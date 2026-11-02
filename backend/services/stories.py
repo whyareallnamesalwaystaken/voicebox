@@ -306,7 +306,12 @@ async def add_item_to_story(
         else:
             max_end_time_ms = 0
             for item, gen in existing_items:
-                item_end_ms = item.start_time_ms + int(gen.duration * 1000)
+                item_trim_start = getattr(item, "trim_start_ms", 0)
+                item_trim_end = getattr(item, "trim_end_ms", 0)
+                item_effective_duration_ms = (
+                    int(gen.duration * 1000) - item_trim_start - item_trim_end
+                )
+                item_end_ms = item.start_time_ms + item_effective_duration_ms
                 max_end_time_ms = max(max_end_time_ms, item_end_ms)
 
             # Add 200ms gap after the last item
