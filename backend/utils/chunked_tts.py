@@ -15,6 +15,9 @@ from typing import List, Tuple
 
 import numpy as np
 
+from .audio import is_silent_audio
+from .text_normalize import normalization_enabled, normalize_for_tts
+
 logger = logging.getLogger("voicebox.chunked-tts")
 
 # Default chunk size in characters.  Can be overridden per-request via
@@ -22,6 +25,7 @@ logger = logging.getLogger("voicebox.chunked-tts")
 DEFAULT_MAX_CHUNK_CHARS = 800
 MAX_RUNAWAY_RETRIES = 2
 MIN_RUNAWAY_RETRY_CHARS = 100
+SILENT_RETRY_SEED_OFFSET = 7919
 
 # Common abbreviations that should NOT be treated as sentence endings.
 # Lowercase for case-insensitive matching.
@@ -214,6 +218,8 @@ async def generate_chunked(
     crossfade_ms: int = 50,
     trim_fn=None,
     runaway_detector=None,
+    max_chunk_ceiling: int | None = None,
+    normalize_text: bool = True,
 ) -> Tuple[np.ndarray, int]:
     """Generate audio with automatic chunking for long text.
 
@@ -245,6 +251,18 @@ async def generate_chunked(
     runaway_detector : callable | None
         Optional ``(audio, sample_rate) -> bool`` detector. When it flags
         unstable output, the affected text is split in half and retried.
+    max_chunk_ceiling : int | None
+        Engine-specific hard cap on chunk size, applied on top of
+        *max_chunk_chars* (see ``engine_max_chunk_chars``). Chatterbox
+        garbles and drops words near the end of long single passes.
+    normalize_text : bool
+        Rewrite numbers, symbols, paths and code into speakable English
+        first (see ``utils.text_normalize``). English only; also disabled
+        server-wide by ``VOICEBOX_TEXT_NORMALIZE=0``.
+
+    Engine output that is silent is regenerated once with a different seed;
+    if it is still silent a ``RuntimeError`` is raised so the generation is
+    marked failed instead of saving a silent clip as a success.
 
     Returns
     -------
@@ -262,6 +280,26 @@ async def generate_chunked(
             chunk_seed,
             instruct,
         )
+
+        if is_silent_audio(chunk_audio):
+            # A silent render is an engine failure, not an answer. Try once
+            # more on a different seed, then fail loudly.
+            retry_seed = (chunk_seed + SILENT_RETRY_SEED_OFFSET) if chunk_seed is not None else None
+            logger.warning(
+                "TTS engine returned silent audio for %d chars; retrying once",
+                len(chunk_text),
+            )
+            chunk_audio, chunk_sr = await backend.generate(
+                chunk_text,
+                voice_prompt,
+                language,
+                retry_seed,
+                instruct,
+            )
+            if is_silent_audio(chunk_audio):
+                raise RuntimeError(
+                    "TTS engine returned silent audio twice for the same text"
+                )
 
         if runaway_detector is not None and runaway_detector(chunk_audio, chunk_sr):
             if retry_depth >= MAX_RUNAWAY_RETRIES or len(chunk_text) <= MIN_RUNAWAY_RETRY_CHARS:
@@ -312,8 +350,23 @@ async def generate_chunked(
             )
 
         if trim_fn is not None:
-            chunk_audio = trim_fn(chunk_audio, chunk_sr)
+            trimmed = trim_fn(chunk_audio, chunk_sr)
+            # trim_tts_output already refuses to empty a clip; this also
+            # covers any other trim_fn a caller passes in.
+            if not is_silent_audio(trimmed):
+                chunk_audio = trimmed
+            else:
+                logger.warning("trim produced silent audio; keeping untrimmed chunk")
         return np.asarray(chunk_audio, dtype=np.float32), chunk_sr
+
+    if normalize_text and normalization_enabled():
+        normalized = normalize_for_tts(text, language)
+        if normalized != text:
+            logger.debug("Normalized TTS text: %r -> %r", text, normalized)
+        text = normalized
+
+    if max_chunk_ceiling is not None and max_chunk_chars > max_chunk_ceiling:
+        max_chunk_chars = max_chunk_ceiling
 
     chunks = split_text_into_chunks(text, max_chunk_chars)
 

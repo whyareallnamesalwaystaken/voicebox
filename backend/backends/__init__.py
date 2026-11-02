@@ -18,6 +18,13 @@ from typing import Protocol, Optional, Tuple, List
 from typing_extensions import runtime_checkable
 import numpy as np
 
+# Chatterbox (both variants) garbles and drops words near the end of long
+# single passes. Measured on Chatterbox Turbo with a 627-char paragraph:
+# 800-char chunks scored 0.93-0.94 word match against the input with a
+# garbled tail ("instead of full Sigefreet"); 300-char chunks scored
+# 0.98-0.99 with no tail garbling.
+CHATTERBOX_MAX_CHUNK_CHARS = 300
+
 DEFAULT_LLM_MAX_TOKENS = 512
 DEFAULT_LLM_TEMPERATURE = 0.7
 
@@ -65,6 +72,9 @@ class ModelConfig:
     size_mb: int = 0
     needs_trim: bool = False
     retries_runaway: bool = False
+    # Hard cap on characters per TTS pass, applied on top of the request's
+    # max_chunk_chars. None = no engine-specific cap.
+    max_chunk_chars: Optional[int] = None
     supports_instruct: bool = False
     languages: list[str] = field(default_factory=lambda: ["en"])
 
@@ -369,6 +379,7 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
             # listener as an endless hiss. Retrying the affected text as smaller chunks is the
             # existing remedy; it just was not wired for this engine.
             retries_runaway=on_mlx,
+            max_chunk_chars=CHATTERBOX_MAX_CHUNK_CHARS,
             languages=[
                 "zh",
                 "en",
@@ -402,6 +413,7 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
             hf_repo_id="ResembleAI/chatterbox-turbo",
             size_mb=1500,
             needs_trim=True,
+            max_chunk_chars=CHATTERBOX_MAX_CHUNK_CHARS,
             languages=["en"],
         ),
         ModelConfig(
@@ -614,6 +626,14 @@ def engine_needs_trim(engine: str) -> bool:
         if cfg.engine == engine:
             return cfg.needs_trim
     return False
+
+
+def engine_max_chunk_chars(engine: str) -> Optional[int]:
+    """Engine-specific ceiling on characters per TTS pass, or None."""
+    for cfg in get_tts_model_configs():
+        if cfg.engine == engine:
+            return cfg.max_chunk_chars
+    return None
 
 
 def engine_retries_runaway(engine: str) -> bool:

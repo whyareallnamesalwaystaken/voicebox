@@ -66,6 +66,7 @@ async def run_generation(
     It is designed to be enqueued via ``services.task_queue.enqueue_generation``.
     """
     from ..backends import (
+        engine_max_chunk_chars,
         engine_needs_trim,
         engine_retries_runaway,
         get_tts_backend_for_engine,
@@ -103,6 +104,7 @@ async def run_generation(
             instruct=instruct,
             trim_fn=trim_fn,
             runaway_detector=runaway_detector,
+            max_chunk_ceiling=engine_max_chunk_chars(engine),
         )
         if max_chunk_chars is not None:
             gen_kwargs["max_chunk_chars"] = max_chunk_chars
@@ -294,6 +296,7 @@ async def generate_audio_sync(
     (same helper ``/generate/stream`` uses).
     """
     from ..backends import (
+        engine_max_chunk_chars,
         engine_needs_trim,
         engine_retries_runaway,
         get_tts_backend_for_engine,
@@ -327,6 +330,7 @@ async def generate_audio_sync(
         instruct=instruct,
         trim_fn=trim_fn,
         runaway_detector=runaway_detector,
+        max_chunk_ceiling=engine_max_chunk_chars(engine),
     )
     if max_chunk_chars is not None:
         gen_kwargs["max_chunk_chars"] = max_chunk_chars

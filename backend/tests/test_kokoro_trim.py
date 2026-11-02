@@ -20,7 +20,7 @@ def test_trim_tts_output_edge_only_keeps_internal_gaps():
     """With max_internal_silence_ms=None only the edges are trimmed."""
     sr = 24000
     speech = np.full(int(sr * 1.0), 0.2, dtype=np.float32)
-    gap = np.zeros(int(sr * 1.5), dtype=np.float32)  # longer than the 1s default cut
+    gap = np.zeros(int(sr * 3.0), dtype=np.float32)  # longer than the 2.5s default cut
     pad = np.zeros(int(sr * 0.5), dtype=np.float32)
     raw_audio = np.concatenate([pad, speech, gap, speech, pad])
 
@@ -30,7 +30,7 @@ def test_trim_tts_output_edge_only_keeps_internal_gaps():
     # Default behaviour cuts at the internal gap and drops the second utterance.
     assert len(default_trim) / sr == pytest.approx(1.0, abs=0.25)
     # Edge-only trim keeps both utterances and the gap between them.
-    assert len(edge_trim) / sr == pytest.approx(1.0 + 1.5 + 1.0 + 0.2, abs=0.05)
+    assert len(edge_trim) / sr == pytest.approx(1.0 + 3.0 + 1.0 + 0.2, abs=0.05)
 
 
 def test_kokoro_trim_tts_output_removes_trailing_dead_space():
@@ -42,8 +42,9 @@ def test_kokoro_trim_tts_output_removes_trailing_dead_space():
 
     trimmed = trim_tts_output(raw_audio, sample_rate=sr)
 
-    # Trimming cuts trailing silence from 2.5s down to speech duration boundary (1.5s)
-    expected_dur_samples = int(sr * 1.5)
+    # Trailing silence is cut back to the speech boundary plus the short
+    # min_silence_ms tail (200ms) the trim deliberately keeps: 2.5s -> 1.7s.
+    expected_dur_samples = int(sr * (1.5 + 0.2))
     assert len(trimmed) == expected_dur_samples
     assert len(trimmed) < len(raw_audio)
 

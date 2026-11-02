@@ -2,10 +2,32 @@
 Audio processing utilities.
 """
 
+import logging
+
 import numpy as np
 import soundfile as sf
 import librosa
 from typing import Tuple, Optional
+
+logger = logging.getLogger(__name__)
+
+# trim_tts_output tuning (see that function for the reasoning).
+_SILENCE_FLOOR_DB = -70.0  # below this a frame is silence no matter what
+_TRIM_RELATIVE_DB = 30.0  # speech = within this many dB of the clip's loud level
+_TRIM_GUARD_MIN_KEEP = 0.2  # trims keeping less than this share of speech frames are rejected
+
+
+def is_silent_audio(audio: np.ndarray, silence_db: float = -60.0) -> bool:
+    """True when *audio* is empty or its peak never rises above *silence_db*.
+
+    Peak rather than whole-clip RMS, so a short but real utterance inside a
+    long silent buffer still counts as audio.
+    """
+    audio = np.asarray(audio, dtype=np.float32).reshape(-1)
+    if audio.size == 0:
+        return True
+    peak = float(np.max(np.abs(audio)))
+    return peak <= 10 ** (silence_db / 20)
 
 
 def normalize_audio(
@@ -153,7 +175,7 @@ def trim_tts_output(
     frame_ms: int = 20,
     silence_threshold_db: float = -40.0,
     min_silence_ms: int = 200,
-    max_internal_silence_ms: int | None = 1000,
+    max_internal_silence_ms: int | None = 2500,
     fade_ms: int = 30,
 ) -> np.ndarray:
     """
@@ -182,7 +204,6 @@ def trim_tts_output(
         return audio
 
     n_frames = len(audio) // frame_len
-    threshold_linear = 10 ** (silence_threshold_db / 20)
 
     # Compute per-frame RMS
     rms = np.array(
@@ -191,7 +212,28 @@ def trim_tts_output(
             for i in range(n_frames)
         ]
     )
+
+    # This runs BEFORE loudness normalization, so a fixed -40 dBFS gate
+    # classifies soft-but-real engine output as silence and trims it to
+    # nothing. Relax the gate for quiet clips: a frame counts as speech if
+    # it's within _TRIM_RELATIVE_DB of the clip's typical loud level (95th
+    # percentile, so one stray click can't set the reference), never
+    # stricter than silence_threshold_db and never below the absolute floor.
+    loud_ref = float(np.percentile(rms, 95))
+    loud_ref_db = 20 * np.log10(loud_ref) if loud_ref > 0 else _SILENCE_FLOOR_DB
+    threshold_db = max(
+        min(silence_threshold_db, loud_ref_db - _TRIM_RELATIVE_DB),
+        _SILENCE_FLOOR_DB,
+    )
+    threshold_linear = 10 ** (threshold_db / 20)
     is_speech = rms >= threshold_linear
+
+    if not is_speech.any():
+        # Nothing reads as speech. Trimming would return an empty clip, so
+        # hand back the input untouched; deciding whether silent output is a
+        # failure is the caller's job (see is_silent_audio).
+        logger.warning("trim_tts_output: no speech frames detected, returning untrimmed audio")
+        return audio
 
     # Find first speech frame
     first_speech = 0
@@ -227,6 +269,22 @@ def trim_tts_output(
     end_sample = min(end_frame * frame_len, len(audio))
 
     trimmed = audio[start_sample:end_sample].copy()
+
+    # Safety net: a trim that keeps only a sliver of everything that read as
+    # speech is far more likely to be eating real speech (e.g. a loud click
+    # followed by a soft take) than removing hallucination, which is at most
+    # a similar amount of output after the gap. Measured in speech frames,
+    # not clip length, so long silences around a real hallucination tail
+    # don't trip it. Ship the untrimmed audio rather than a near-empty clip.
+    total_speech = int(is_speech.sum())
+    kept_speech = int(is_speech[first_speech:end_frame].sum())
+    if kept_speech < _TRIM_GUARD_MIN_KEEP * total_speech:
+        logger.warning(
+            "trim_tts_output: trim would keep %d of %d speech frames, returning untrimmed audio",
+            kept_speech,
+            total_speech,
+        )
+        return audio
 
     # Cosine fade-out
     fade_samples = int(sample_rate * fade_ms / 1000)

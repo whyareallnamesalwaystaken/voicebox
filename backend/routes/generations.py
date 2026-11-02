@@ -322,6 +322,7 @@ async def stream_speech(
 ):
     """Generate speech and stream the WAV audio directly without saving to disk."""
     from ..backends import (
+        engine_max_chunk_chars,
         engine_needs_trim,
         engine_retries_runaway,
         ensure_model_cached_or_raise,
@@ -375,6 +376,7 @@ async def stream_speech(
             crossfade_ms=data.crossfade_ms,
             trim_fn=trim_fn,
             runaway_detector=runaway_detector,
+            max_chunk_ceiling=engine_max_chunk_chars(engine),
         )
     finally:
         release_generation_memory(tts_model)
